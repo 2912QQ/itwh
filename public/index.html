@@ -59,10 +59,15 @@ th,td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(56,189,248,.1
 td button{padding:3px 10px;margin-right:4px}.hide{display:none!important}
 .mask{position:fixed;inset:0;background:rgba(2,6,14,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:20}
 .mask .login{margin:0;width:90%}
+#bg{position:fixed;inset:0;z-index:-1;pointer-events:none}
+body{background:radial-gradient(1000px 600px at 85% -10%,rgba(99,102,241,.24),transparent 60%),radial-gradient(900px 600px at 0 100%,rgba(6,182,212,.15),transparent 60%),linear-gradient(160deg,#050816,#0a1230 55%,#0b0720);background-attachment:fixed}
+body::after{display:none}
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(rgba(5,8,22,var(--dim,0)),rgba(5,8,22,var(--dim,0))),var(--bgimg,none) center/cover no-repeat}
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
 <body>
+<canvas id="bg"></canvas>
 <div id="login" class="login hide">
   <h1 id="ltitle">网络设备运维平台</h1>
   <div class="sub">SECURE ACCESS // 身份验证</div>
@@ -102,12 +107,23 @@ td button{padding:3px 10px;margin-right:4px}.hide{display:none!important}
           <input id="f-addr" placeholder="IP 或域名 *"><input id="f-port" placeholder="端口(可空)">
           <input id="f-note" placeholder="备注">
           <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="f-mon" checked style="width:auto">启用在线检测</label>
+          <select id="f-via"><option value="cloud">云端检测(公网设备)</option><option value="agent">内网探测器(内网设备)</option></select>
         </div>
         <button id="f-save">保存设备</button> <button class="g" id="f-reset">清空表单</button>
         <table style="margin-top:14px"><thead><tr><th>名称</th><th>分组</th><th>地址</th><th></th></tr></thead><tbody id="dev-rows"></tbody></table>
       </div>
       <div id="t-set" class="panel hide">
         <div class="form"><input id="s-title" placeholder="站点标题"><input id="s-notice" placeholder="首页公告(留空则不显示)"></div>
+        <h2 style="margin-top:6px">背景设置</h2>
+        <div class="form">
+          <select id="s-bgmode"><option value="default">默认(动态网络拓扑)</option><option value="url">网络图片链接</option><option value="upload">上传图片</option></select>
+          <input id="s-bgurl" placeholder="图片链接,需 https:// 开头" class="hide">
+          <div id="s-bgup" class="hide" style="display:flex;gap:8px;align-items:center"><input id="s-file" type="file" accept="image/*"><button class="d" id="s-bgdel" type="button">清除</button></div>
+        </div>
+        <div class="form">
+          <label style="display:flex;align-items:center;gap:10px">背景暗度 <input id="s-dim" type="range" min="0" max="90" step="5" style="padding:0"><b id="s-dimv" class="hud"></b></label>
+          <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="s-net" style="width:auto">叠加动态网络线条</label>
+        </div>
         <button id="s-save">保存设置</button>
       </div>
       <div id="t-usr" class="panel hide">
@@ -164,7 +180,7 @@ function applySettings(){
   const t=settings.title||'网络设备运维平台';
   document.title=t;$('title').textContent=t;$('ltitle').textContent=t;
   $('notice').textContent=settings.notice||'';$('notice').classList.toggle('hide',!settings.notice);
-  $('s-title').value=settings.title||'';$('s-notice').value=settings.notice||'';
+  $('s-title').value=settings.title||'';$('s-notice').value=settings.notice||'';fillBg();applyBg();
 }
 async function loadDevices(){devices=await api('devices');renderHome();renderRows()}
 
@@ -223,11 +239,11 @@ function renderRows(){
   $('dev-rows').innerHTML=devices.map(d=>`<tr><td>${esc(d.name)}</td><td>${esc(d.grp)}</td><td>${esc(link(d))}</td>
    <td><button data-e="${d.id}">编辑</button><button class="d" data-x="${d.id}">删除</button></td></tr>`).join('');
 }
-function resetForm(){editId=null;F.forEach(k=>$('f-'+k).value=(k==='proto'?'https':''));$('f-mon').checked=true}
+function resetForm(){editId=null;F.forEach(k=>$('f-'+k).value=(k==='proto'?'https':''));$('f-mon').checked=true;$('f-via').value='cloud'}
 $('f-reset').onclick=resetForm;
 $('f-save').onclick=async()=>{
   const b={name:$('f-name').value,grp:$('f-grp').value,type:$('f-type').value,protocol:$('f-proto').value,
-    address:$('f-addr').value,port:$('f-port').value,note:$('f-note').value,monitor:$('f-mon').checked?1:0};
+    address:$('f-addr').value,port:$('f-port').value,note:$('f-note').value,monitor:$('f-mon').checked?1:0,via:$('f-via').value};
   try{editId?await api('devices/'+editId,'PUT',b):await api('devices','POST',b);resetForm();loadDevices()}
   catch(e){alert(e.message)}
 };
@@ -236,11 +252,11 @@ $('dev-rows').onclick=async e=>{
   if(e.target.dataset.x){if(confirm('确定删除该设备?')){await api('devices/'+id,'DELETE');loadDevices()}return}
   const d=devices.find(x=>x.id==id);editId=id;
   $('f-name').value=d.name;$('f-grp').value=d.grp;$('f-type').value=d.type;$('f-proto').value=d.protocol;
-  $('f-addr').value=d.address;$('f-port').value=d.port;$('f-note').value=d.note;$('f-mon').checked=!!d.monitor;scrollTo(0,0);
+  $('f-addr').value=d.address;$('f-port').value=d.port;$('f-note').value=d.note;$('f-mon').checked=!!d.monitor;$('f-via').value=d.via||'cloud';scrollTo(0,0);
 };
 // 站点设置
 $('s-save').onclick=async()=>{
-  try{await api('settings','PUT',{title:$('s-title').value,notice:$('s-notice').value});
+  try{await api('settings','PUT',{title:$('s-title').value,notice:$('s-notice').value,bg_mode:$('s-bgmode').value,bg_url:$('s-bgurl').value.trim(),bg_dim:$('s-dim').value,bg_net:$('s-net').checked?'1':'0'});
     settings=await api('settings');applySettings();alert('已保存')}catch(e){alert(e.message)}
 };
 // 用户管理
@@ -259,10 +275,10 @@ $('usr-rows').onclick=async e=>{
   if(u&&confirm('删除用户 '+u+'?')){await api('users/'+encodeURIComponent(u),'DELETE');loadUsers()}
 };
 // ---- 在线状态 ----
-const dot=d=>`<i class="dot ${!d.monitor||d.status==null?'':d.status?'on':'off'}"></i>`;
+const dot=d=>`<i class="dot ${cls(d)}"></i>`;
 const stat=d=>{
   if(!d.monitor)return '未启用检测';
-  if(d.status==null)return '未检测';
+  if(eff(d)==null)return d.via==='agent'?(d.checked_at?'探测器无数据(已过期)':'等待探测器上报'):'未检测';
   const t=d.checked_at?new Date(d.checked_at).toLocaleTimeString('zh-CN',{hour12:false}):'';
   return (d.status?`在线 ${d.latency}ms`:'离线')+' · '+t;
 };
@@ -276,10 +292,63 @@ async function checkAll(){
 $('refresh').onclick=checkAll;
 setInterval(()=>{if(me&&!$('view-home').classList.contains('hide'))loadDevices().catch(()=>{})},60000);
 
+// ---- 背景:动态网络拓扑 ----
+(()=>{const c=$('bg'),x=c.getContext('2d');let W,H,P=[];
+const rs=()=>{W=c.width=innerWidth;H=c.height=innerHeight;P=Array.from({length:Math.min(90,Math.floor(W*H/18000))},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4}))};
+rs();addEventListener('resize',rs);
+const still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+(function f(){x.clearRect(0,0,W,H);
+ for(const p of P){if(!still){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1}
+  x.fillStyle='rgba(34,211,238,.8)';x.beginPath();x.arc(p.x,p.y,1.8,0,7);x.fill()}
+ for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){const a=P[i],b=P[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+  if(d<140){x.strokeStyle=`rgba(56,189,248,${.28*(1-d/140)})`;x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke()}}
+ if(!still)requestAnimationFrame(f)})();})();
+
+// ---- 自定义背景 ----
+const dimOf=()=>settings.bg_dim==null?55:+settings.bg_dim;
+function applyBg(){
+  const m=settings.bg_mode||'default';
+  const src=m==='url'&&settings.bg_url?settings.bg_url:m==='upload'?'/api/bg?v='+(settings.bg_ver||0):'';
+  const st=document.body.style;
+  st.setProperty('--bgimg',src?`url("${src}")`:'none');st.setProperty('--dim',src?dimOf()/100:0);
+  $('bg').style.display=src&&settings.bg_net==='0'?'none':'';
+}
+function syncBgForm(){const m=$('s-bgmode').value;$('s-bgurl').classList.toggle('hide',m!=='url');$('s-bgup').classList.toggle('hide',m!=='upload')}
+function fillBg(){
+  $('s-bgmode').value=settings.bg_mode||'default';$('s-bgurl').value=settings.bg_url||'';
+  $('s-dim').value=dimOf();$('s-dimv').textContent=dimOf()+'%';$('s-net').checked=settings.bg_net!=='0';syncBgForm();
+}
+$('s-bgmode').onchange=syncBgForm;
+$('s-dim').oninput=()=>$('s-dimv').textContent=$('s-dim').value+'%';
+async function pack(file){   // 缩放到最长边 1920 并压缩为 JPEG,保证 <1.4MB
+  const img=await createImageBitmap(file);
+  let sc=Math.min(1,1920/Math.max(img.width,img.height)),q=.82;
+  for(let i=0;i<8;i++){
+    const c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const d=c.toDataURL('image/jpeg',q);
+    if(d.length<1.4e6)return d;
+    sc*=.8;q=Math.max(.5,q-.08);
+  }
+  throw new Error('图片太大,请换一张');
+}
+$('s-file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{await api('bg','POST',{data:await pack(f)});settings=await api('settings');applySettings();alert('已上传并应用')}
+  catch(err){alert(err.message||'上传失败')}
+  e.target.value='';
+};
+$('s-bgdel').onclick=async()=>{
+  if(!confirm('清除已上传的背景图?'))return;
+  try{await api('bg','DELETE');settings=await api('settings');applySettings()}catch(err){alert(err.message)}
+};
+fetch('/api/public').then(r=>r.json()).then(s=>{if(!me){settings=s;applySettings()}}).catch(()=>{});
+
 // ---- 统计 / 时钟 ----
-const cls=d=>!d.monitor||d.status==null?'':d.status?'on':'off';
+const eff=d=>!d.monitor||d.status==null||(d.via==='agent'&&Date.now()-d.checked_at>15*60e3)?null:d.status;
+const cls=d=>{const s=eff(d);return s==null?'':s?'on':'off'};
 function renderStats(){
-  const m=devices.filter(d=>d.monitor),on=m.filter(d=>d.status===1).length,off=m.filter(d=>d.status===0).length;
+  const m=devices.filter(d=>d.monitor),on=m.filter(d=>eff(d)===1).length,off=m.filter(d=>eff(d)===0).length;
   $('stats').innerHTML=[['设备总数',devices.length,'#22d3ee'],['在线',on,'#22c55e'],['离线',off,'#ef4444'],['未检测',devices.length-on-off,'#94a3b8']]
     .map(x=>`<div class="stat" style="--c:${x[2]}"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('');
 }
@@ -287,7 +356,7 @@ const tick=()=>{$('clock').textContent=new Date().toLocaleString('zh-CN',{hour12
 
 // ---- 审计日志 ----
 let logLast=0;
-const ACT={login:'登录',login_fail:'登录失败',unlock:'后台验证',unlock_fail:'后台验证失败',logout:'退出',open_device:'打开设备',device_add:'新增设备',device_update:'修改设备',device_delete:'删除设备',settings_update:'修改设置',user_save:'添加/重置用户',user_delete:'删除用户'};
+const ACT={login:'登录',login_fail:'登录失败',unlock:'后台验证',unlock_fail:'后台验证失败',bg_upload:'上传背景',bg_clear:'清除背景',logout:'退出',open_device:'打开设备',device_add:'新增设备',device_update:'修改设备',device_delete:'删除设备',settings_update:'修改设置',user_save:'添加/重置用户',user_delete:'删除用户'};
 async function loadLog(){
   const r=await api('audit?limit=100'+(logLast?'&before='+logLast:''));
   $('log-rows').insertAdjacentHTML('beforeend',r.map(x=>`<tr><td>${new Date(x.ts).toLocaleString('zh-CN',{hour12:false})}</td><td>${esc(x.user)}</td><td>${esc(ACT[x.action]||x.action)}</td><td>${esc(x.detail)}</td><td>${esc(x.ip)}</td></tr>`).join(''));
