@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>网络设备运维平台</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--tx:#1b2430;--mu:#6b7686;--bd:#dde2ea;--pr:#2563eb;--dg:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#18202a;--tx:#e6ebf2;--mu:#8b97a8;--bd:#2a3442;--pr:#4f8bff;--dg:#f05252}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,"PingFang SC","Microsoft YaHei",sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--bd);position:sticky;top:0}
+header h1{font-size:17px;margin:0;flex:1}
+button{background:var(--pr);color:#fff;border:0;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px}
+button.g{background:transparent;color:var(--tx);border:1px solid var(--bd)}button.d{background:var(--dg)}
+input,select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;font-size:13px;width:100%}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.notice{background:#fef3c7;color:#92400e;padding:10px 14px;border-radius:8px;margin-bottom:16px}
+h2{font-size:14px;color:var(--mu);margin:22px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;cursor:pointer;transition:.15s}
+.card:hover{border-color:var(--pr);transform:translateY(-2px)}
+.card b{display:block;font-size:15px}.card small{color:var(--mu);display:block;word-break:break-all}
+.tag{display:inline-block;font-size:11px;background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:0 6px;margin-top:6px}
+.login{max-width:340px;margin:12vh auto;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:28px}
+.login h1{font-size:19px;margin:0 0 18px;text-align:center}.login input{margin-bottom:12px}.login button{width:100%;padding:10px}
+.err{color:var(--dg);min-height:20px;font-size:13px}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:16px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs .on{background:var(--pr);color:#fff}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#9ca3af;margin-right:7px}.dot.on{background:#16a34a}.dot.off{background:#dc2626}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);word-break:break-all}
+td button{padding:3px 9px;margin-right:4px}.hide{display:none}
+</style>
+</head>
+<body>
+<div id="login" class="login hide">
+  <h1 id="ltitle">网络设备运维平台</h1>
+  <input id="u" placeholder="用户名" autocomplete="username">
+  <input id="p" type="password" placeholder="密码" autocomplete="current-password">
+  <div class="err" id="lerr"></div>
+  <button id="lbtn">登 录</button>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <h1 id="title"></h1><span id="who" style="color:var(--mu)"></span>
+    <button class="g" id="refresh">刷新状态</button>
+    <button class="g" id="toggle">后台管理</button>
+    <button class="g" id="logout">退出</button>
+  </header>
+  <main>
+    <div id="view-home">
+      <div id="notice" class="notice hide"></div>
+      <input id="q" placeholder="搜索设备名称 / 地址 / 备注…" style="max-width:360px;margin-bottom:6px">
+      <div id="list"></div>
+    </div>
+
+    <div id="view-admin" class="hide">
+      <div class="tabs">
+        <button class="on" data-t="dev">设备管理</button>
+        <button class="g" data-t="set">站点设置</button>
+        <button class="g" data-t="usr">用户管理</button>
+        <button class="g" data-t="log">审计日志</button>
+      </div>
+      <div id="t-dev" class="panel">
+        <div class="form">
+          <input id="f-name" placeholder="设备名称 *"><input id="f-grp" placeholder="分组(如 核心机房)">
+          <input id="f-type" placeholder="类型(交换机/防火墙…)">
+          <select id="f-proto"><option>https</option><option>http</option><option>ssh</option><option>telnet</option><option>rdp</option></select>
+          <input id="f-addr" placeholder="IP 或域名 *"><input id="f-port" placeholder="端口(可空)">
+          <input id="f-note" placeholder="备注">
+          <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="f-mon" checked style="width:auto">启用在线检测</label>
+        </div>
+        <button id="f-save">保存设备</button> <button class="g" id="f-reset">清空表单</button>
+        <table style="margin-top:14px"><thead><tr><th>名称</th><th>分组</th><th>地址</th><th></th></tr></thead><tbody id="dev-rows"></tbody></table>
+      </div>
+      <div id="t-set" class="panel hide">
+        <div class="form"><input id="s-title" placeholder="站点标题"><input id="s-notice" placeholder="首页公告(留空则不显示)"></div>
+        <button id="s-save">保存设置</button>
+      </div>
+      <div id="t-usr" class="panel hide">
+        <div class="form">
+          <input id="n-user" placeholder="用户名"><input id="n-pass" type="password" placeholder="密码(至少8位)">
+          <select id="n-role"><option value="viewer">只读用户</option><option value="admin">管理员</option></select>
+        </div>
+        <button id="n-save">添加 / 重置密码</button>
+        <table style="margin-top:14px"><thead><tr><th>用户</th><th>角色</th><th></th></tr></thead><tbody id="usr-rows"></tbody></table>
+      </div>
+      <div id="t-log" class="panel hide">
+        <table><thead><tr><th>时间</th><th>用户</th><th>操作</th><th>详情</th><th>来源IP</th></tr></thead><tbody id="log-rows"></tbody></table>
+        <button class="g hide" id="log-more" style="margin-top:12px">加载更多</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let me,devices=[],settings={},editId=null;
+
+async function api(path,method='GET',body){
+  const r=await fetch('/api/'+path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
+  const d=await r.json().catch(()=>({}));
+  if(r.status===401&&path!=='login'){showLogin();throw new Error('401')}
+  if(!r.ok)throw new Error(d.error||'请求失败');
+  return d;
+}
+function link(d){
+  if(/^https?:\/\//i.test(d.address))return d.address;
+  return `${d.protocol}://${d.address}${d.port?':'+d.port:''}`;
+}
+function showLogin(){$('app').classList.add('hide');$('login').classList.remove('hide')}
+async function boot(){
+  try{
+    me=await api('me');settings=await api('settings');
+    $('login').classList.add('hide');$('app').classList.remove('hide');
+    $('who').textContent=`${me.u}(${me.role==='admin'?'管理员':'只读'})`;
+    $('toggle').classList.toggle('hide',me.role!=='admin');
+    applySettings();await loadDevices();
+  }catch(e){showLogin()}
+}
+function applySettings(){
+  const t=settings.title||'网络设备运维平台';
+  document.title=t;$('title').textContent=t;$('ltitle').textContent=t;
+  $('notice').textContent=settings.notice||'';$('notice').classList.toggle('hide',!settings.notice);
+  $('s-title').value=settings.title||'';$('s-notice').value=settings.notice||'';
+}
+async function loadDevices(){devices=await api('devices');renderHome();renderRows()}
+
+function renderHome(){
+  const q=$('q').value.trim().toLowerCase(),g={};
+  devices.filter(d=>!q||[d.name,d.address,d.note,d.type,d.grp].join(' ').toLowerCase().includes(q))
+    .forEach(d=>(g[d.grp]=g[d.grp]||[]).push(d));
+  $('list').innerHTML=Object.keys(g).map(k=>`<h2>${esc(k)}</h2><div class="grid">`+g[k].map(d=>
+    `<div class="card" data-id="${d.id}"><b>${dot(d)}${esc(d.name)}</b><small>${esc(d.address)}${d.port?':'+esc(d.port):''}</small><small>${stat(d)}</small>
+     <span class="tag">${esc(d.protocol)}</span> ${d.type?`<span class="tag">${esc(d.type)}</span>`:''}
+     ${d.note?`<small style="margin-top:6px">${esc(d.note)}</small>`:''}</div>`).join('')+'</div>').join('')||'<p style="color:var(--mu)">暂无设备</p>';
+}
+$('list').onclick=e=>{
+  const c=e.target.closest('.card');if(!c)return;
+  const d=devices.find(x=>x.id==c.dataset.id);
+  if(d){api('open/'+d.id,'POST').catch(()=>{});window.open(link(d),'_blank','noopener');}
+};
+$('q').oninput=renderHome;
+
+$('lbtn').onclick=async()=>{
+  $('lerr').textContent='';
+  try{await api('login','POST',{username:$('u').value.trim(),password:$('p').value});$('p').value='';boot()}
+  catch(e){$('lerr').textContent=e.message}
+};
+$('p').onkeydown=e=>{if(e.key==='Enter')$('lbtn').click()};
+$('logout').onclick=async()=>{await api('logout','POST').catch(()=>{});showLogin()};
+$('toggle').onclick=()=>{
+  const a=$('view-admin').classList.toggle('hide');$('view-home').classList.toggle('hide',!a);
+  $('toggle').textContent=a?'后台管理':'返回首页';if(!a)loadUsers();
+};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.className='g');b.className='on';
+  ['dev','set','usr','log'].forEach(t=>$('t-'+t).classList.toggle('hide',t!==b.dataset.t));
+  if(b.dataset.t==='usr')loadUsers();
+  if(b.dataset.t==='log'){logLast=0;$('log-rows').innerHTML='';loadLog()}
+});
+
+// 设备管理
+const F=['name','grp','type','proto','addr','port','note'];
+function renderRows(){
+  $('dev-rows').innerHTML=devices.map(d=>`<tr><td>${esc(d.name)}</td><td>${esc(d.grp)}</td><td>${esc(link(d))}</td>
+   <td><button data-e="${d.id}">编辑</button><button class="d" data-x="${d.id}">删除</button></td></tr>`).join('');
+}
+function resetForm(){editId=null;F.forEach(k=>$('f-'+k).value=(k==='proto'?'https':''));$('f-mon').checked=true}
+$('f-reset').onclick=resetForm;
+$('f-save').onclick=async()=>{
+  const b={name:$('f-name').value,grp:$('f-grp').value,type:$('f-type').value,protocol:$('f-proto').value,
+    address:$('f-addr').value,port:$('f-port').value,note:$('f-note').value,monitor:$('f-mon').checked?1:0};
+  try{editId?await api('devices/'+editId,'PUT',b):await api('devices','POST',b);resetForm();loadDevices()}
+  catch(e){alert(e.message)}
+};
+$('dev-rows').onclick=async e=>{
+  const id=e.target.dataset.e||e.target.dataset.x;if(!id)return;
+  if(e.target.dataset.x){if(confirm('确定删除该设备?')){await api('devices/'+id,'DELETE');loadDevices()}return}
+  const d=devices.find(x=>x.id==id);editId=id;
+  $('f-name').value=d.name;$('f-grp').value=d.grp;$('f-type').value=d.type;$('f-proto').value=d.protocol;
+  $('f-addr').value=d.address;$('f-port').value=d.port;$('f-note').value=d.note;$('f-mon').checked=!!d.monitor;scrollTo(0,0);
+};
+// 站点设置
+$('s-save').onclick=async()=>{
+  try{await api('settings','PUT',{title:$('s-title').value,notice:$('s-notice').value});
+    settings=await api('settings');applySettings();alert('已保存')}catch(e){alert(e.message)}
+};
+// 用户管理
+async function loadUsers(){
+  if(me.role!=='admin')return;
+  const us=await api('users');
+  $('usr-rows').innerHTML=us.map(u=>`<tr><td>${esc(u.username)}</td><td>${u.role==='admin'?'管理员':'只读'}</td>
+    <td>${u.username===me.u?'':`<button class="d" data-u="${esc(u.username)}">删除</button>`}</td></tr>`).join('');
+}
+$('n-save').onclick=async()=>{
+  try{await api('users','POST',{username:$('n-user').value.trim(),password:$('n-pass').value,role:$('n-role').value});
+    $('n-user').value=$('n-pass').value='';loadUsers()}catch(e){alert(e.message)}
+};
+$('usr-rows').onclick=async e=>{
+  const u=e.target.dataset.u;
+  if(u&&confirm('删除用户 '+u+'?')){await api('users/'+encodeURIComponent(u),'DELETE');loadUsers()}
+};
+// ---- 在线状态 ----
+const dot=d=>`<i class="dot ${!d.monitor||d.status==null?'':d.status?'on':'off'}"></i>`;
+const stat=d=>{
+  if(!d.monitor)return '未启用检测';
+  if(d.status==null)return '未检测';
+  const t=d.checked_at?new Date(d.checked_at).toLocaleTimeString('zh-CN',{hour12:false}):'';
+  return (d.status?`在线 ${d.latency}ms`:'离线')+' · '+t;
+};
+async function checkAll(){
+  const b=$('refresh');b.disabled=true;b.textContent='检测中…';
+  const q=devices.filter(d=>d.monitor);let i=0;
+  const w=async()=>{while(i<q.length){const d=q[i++];try{Object.assign(d,await api('check/'+d.id,'POST'));renderHome()}catch(e){}}};
+  await Promise.all([w(),w(),w(),w(),w()]);
+  b.disabled=false;b.textContent='刷新状态';
+}
+$('refresh').onclick=checkAll;
+setInterval(()=>{if(me&&!$('view-home').classList.contains('hide'))loadDevices().catch(()=>{})},60000);
+
+// ---- 审计日志 ----
+let logLast=0;
+const ACT={login:'登录',login_fail:'登录失败',logout:'退出',open_device:'打开设备',device_add:'新增设备',device_update:'修改设备',device_delete:'删除设备',settings_update:'修改设置',user_save:'添加/重置用户',user_delete:'删除用户'};
+async function loadLog(){
+  const r=await api('audit?limit=100'+(logLast?'&before='+logLast:''));
+  $('log-rows').insertAdjacentHTML('beforeend',r.map(x=>`<tr><td>${new Date(x.ts).toLocaleString('zh-CN',{hour12:false})}</td><td>${esc(x.user)}</td><td>${esc(ACT[x.action]||x.action)}</td><td>${esc(x.detail)}</td><td>${esc(x.ip)}</td></tr>`).join(''));
+  if(r.length)logLast=r[r.length-1].id;
+  $('log-more').classList.toggle('hide',r.length<100);
+}
+$('log-more').onclick=loadLog;
+boot();
+</script>
+</body>
+</html>

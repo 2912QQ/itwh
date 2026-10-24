@@ -1,0 +1,20 @@
+name = "netops-portal"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+
+# 自定义域名:域名需已托管在 Cloudflare。改成你的域名后取消注释,再 wrangler deploy
+# routes = [{ pattern = "ops.example.com", custom_domain = true }]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "netops"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+# 每 5 分钟自动检测一次设备状态,并清理 180 天前的审计日志
+[triggers]
+crons = ["*/5 * * * *"]
