@@ -34,6 +34,16 @@ async function session(req, env) {
   return row ? { u: row.username, role: row.role } : null;
 }
 
+// ---- 后台二次验证:15 分钟有效的独立 Cookie ----
+async function adminOK(req, env, me) {
+  const m = (req.headers.get('cookie') || '').match(/(?:^|;\s*)a=([^;]+)/);
+  if (!m) return false;
+  const [p, sig] = m[1].split('.');
+  if (!p || !sig || !eq(await sign(env, p), sig)) return false;
+  const [tag, u, exp] = atob(p.replace(/-/g, '+').replace(/_/g, '/')).split('|');
+  return tag === 'adm' && u === me.u && +exp > Date.now();
+}
+
 // ---- 在线检测:对 地址:端口 做 TCP 连接探测 ----
 const PORTS = { https: 443, http: 80, ssh: 22, telnet: 23, rdp: 3389 };
 async function probe(d) {
@@ -105,15 +115,34 @@ export default {
       if (p === '/api/logout') {
         const s = await session(req, env);
         if (s) A(s.u, 'logout');
-        return J({ ok: true }, 200, { 'set-cookie': 's=; Max-Age=0; Path=/' });
+        const h = new Headers({ 'content-type': 'application/json' });
+        h.append('set-cookie', 's=; Max-Age=0; Path=/');
+        h.append('set-cookie', 'a=; Max-Age=0; Path=/api');
+        return new Response('{"ok":true}', { headers: h });
       }
 
       // ---- 以下需要登录 ----
       const me = await session(req, env);
       if (!me) return J({ error: 'unauthorized' }, 401);
-      const needAdmin = () => (me.role === 'admin' ? null : J({ error: '需要管理员权限' }, 403));
+      const unlocked = me.role === 'admin' && (await adminOK(req, env, me));
+      const needAdmin = () => me.role !== 'admin' ? J({ error: '需要管理员权限' }, 403)
+        : unlocked ? null : J({ error: '请先验证管理员密码', code: 'LOCKED' }, 403);
 
-      if (p === '/api/me') return J(me);
+      if (p === '/api/me') return J({ ...me, unlocked });
+      if (p === '/api/admin/unlock' && m === 'POST') {
+        if (me.role !== 'admin') return J({ error: '需要管理员权限' }, 403);
+        const f = await DB.prepare("SELECT COUNT(*) c FROM audit WHERE user=? AND action='unlock_fail' AND ts>?")
+          .bind(me.u, Date.now() - 600e3).first();
+        if (f.c >= 5) return J({ error: '尝试次数过多,请 10 分钟后再试' }, 429);
+        const { password = '' } = await req.json();
+        const u = await DB.prepare('SELECT salt,hash FROM users WHERE username=?').bind(me.u).first();
+        if (!u || !eq(await pbkdf2(password, u.salt), u.hash)) { A(me.u, 'unlock_fail'); return J({ error: '密码错误' }, 403); }
+        A(me.u, 'unlock');
+        const pl = urlsafe(btoa(`adm|${me.u}|${Date.now() + 900e3}`));
+        return J({ ok: true }, 200, {
+          'set-cookie': `a=${pl}.${await sign(env, pl)}; HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=900` });
+      }
+      if (p === '/api/admin/lock') return J({ ok: true }, 200, { 'set-cookie': 'a=; Max-Age=0; Path=/api' });
 
       if (p === '/api/settings') {
         if (m === 'GET') {
