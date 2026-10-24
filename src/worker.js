@@ -66,6 +66,7 @@ async function probe(d) {
 }
 async function check(env, d) {
   if (!d.monitor) return { status: null, latency: null, checked_at: null };
+  if (d.via === 'agent') return { status: d.status, latency: d.latency, checked_at: d.checked_at };  // 由内网探测器上报
   const r = await probe(d), at = Date.now();
   await env.DB.prepare('UPDATE devices SET status=?, latency=?, checked_at=? WHERE id=?')
     .bind(r.status, r.latency, at, d.id).run();
@@ -84,7 +85,7 @@ const dev = (b) => {
   const name = clip(b.name, 80), address = clip(b.address, 255);
   if (!name || !address) return null;
   return [name, clip(b.grp, 40) || '默认分组', clip(b.type, 40),
-    PORTS[b.protocol] ? b.protocol : 'https', address, clip(b.port, 5), clip(b.note, 300), b.monitor ? 1 : 0];
+    PORTS[b.protocol] ? b.protocol : 'https', address, clip(b.port, 5), clip(b.note, 300), b.monitor ? 1 : 0, b.via === 'agent' ? 'agent' : 'cloud'];
 };
 
 export default {
@@ -121,6 +122,34 @@ export default {
         return new Response('{"ok":true}', { headers: h });
       }
 
+      // ---- 公开:登录页也能显示站点标题和背景 ----
+      if (p === '/api/public' && m === 'GET') {
+        const r = await DB.prepare("SELECT k,v FROM settings WHERE k IN ('title','bg_mode','bg_url','bg_dim','bg_net','bg_ver')").all();
+        return J(Object.fromEntries(r.results.map((x) => [x.k, x.v])));
+      }
+      if (p === '/api/bg' && m === 'GET') {
+        const r = await DB.prepare("SELECT v FROM settings WHERE k='bg_data'").first();
+        const mt = r && r.v.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+        if (!mt) return new Response('', { status: 404 });
+        return new Response(Uint8Array.from(atob(mt[2]), (c) => c.charCodeAt(0)),
+          { headers: { 'content-type': mt[1], 'cache-control': 'public, max-age=86400' } });
+      }
+
+      // ---- 内网探测器(Bearer Token 认证)----
+      if (p.startsWith('/api/agent/')) {
+        const tk = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+        if (!env.AGENT_TOKEN || !eq(tk, env.AGENT_TOKEN)) return J({ error: 'unauthorized' }, 401);
+        if (p === '/api/agent/devices' && m === 'GET')
+          return J((await DB.prepare("SELECT id,address,port,protocol FROM devices WHERE monitor=1 AND via='agent'").all()).results);
+        if (p === '/api/agent/report' && m === 'POST') {
+          const list = (await req.json()).slice(0, 200), at = Date.now();
+          await DB.batch(list.map((r) => DB.prepare("UPDATE devices SET status=?,latency=?,checked_at=? WHERE id=? AND via='agent'")
+            .bind(r.status ? 1 : 0, r.status ? (+r.latency || 0) : null, at, +r.id)));
+          return J({ ok: true, n: list.length });
+        }
+        return J({ error: 'not found' }, 404);
+      }
+
       // ---- 以下需要登录 ----
       const me = await session(req, env);
       if (!me) return J({ error: 'unauthorized' }, 401);
@@ -146,18 +175,45 @@ export default {
 
       if (p === '/api/settings') {
         if (m === 'GET') {
-          const r = await DB.prepare('SELECT k,v FROM settings').all();
+          const r = await DB.prepare("SELECT k,v FROM settings WHERE k!='bg_data'").all();
           return J(Object.fromEntries(r.results.map((x) => [x.k, x.v])));
         }
         if (m === 'PUT') {
           const d = needAdmin(); if (d) return d;
           const b = await req.json();
-          for (const k of ['title', 'notice'])
+          if ('bg_mode' in b) {
+            if (!['default', 'url', 'upload'].includes(b.bg_mode)) return J({ error: '背景模式无效' }, 400);
+            if (b.bg_mode === 'url' && !/^https:\/\/[^\s"'()<>\\]{3,480}$/i.test(clip(b.bg_url, 500)))
+              return J({ error: '请填写 https:// 开头的有效图片链接' }, 400);
+            if (b.bg_mode === 'upload' && !(await DB.prepare("SELECT 1 x FROM settings WHERE k='bg_data'").first()))
+              return J({ error: '请先上传图片' }, 400);
+            b.bg_dim = String(Math.min(90, Math.max(0, parseInt(b.bg_dim, 10) || 0)));
+            b.bg_net = b.bg_net === '0' ? '0' : '1';
+          }
+          for (const k of ['title', 'notice', 'bg_mode', 'bg_url', 'bg_dim', 'bg_net'])
             if (k in b) await DB.prepare('INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v')
               .bind(k, clip(b[k], 500)).run();
           A(me.u, 'settings_update', JSON.stringify(b));
           return J({ ok: true });
         }
+      }
+
+      if (p === '/api/bg' && m === 'POST') {   // 上传背景图(前端已压缩为 JPEG)
+        const d = needAdmin(); if (d) return d;
+        const { data = '' } = await req.json();
+        if (data.length > 1.5e6 || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(data))
+          return J({ error: '图片无效或过大(压缩后需小于 1.4MB)' }, 400);
+        const up = (k, v) => DB.prepare('INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind(k, v);
+        await DB.batch([up('bg_data', data), up('bg_mode', 'upload'), up('bg_ver', String(Date.now()))]);
+        A(me.u, 'bg_upload', `${Math.round(data.length / 1024)}KB`);
+        return J({ ok: true });
+      }
+      if (p === '/api/bg' && m === 'DELETE') {
+        const d = needAdmin(); if (d) return d;
+        await DB.batch([DB.prepare("DELETE FROM settings WHERE k='bg_data'"),
+          DB.prepare("UPDATE settings SET v='default' WHERE k='bg_mode' AND v='upload'")]);
+        A(me.u, 'bg_clear');
+        return J({ ok: true });
       }
 
       if (p === '/api/devices') {
@@ -166,7 +222,7 @@ export default {
           const d = needAdmin(); if (d) return d;
           const v = dev(await req.json());
           if (!v) return J({ error: '名称和地址必填' }, 400);
-          await DB.prepare('INSERT INTO devices(name,grp,type,protocol,address,port,note,monitor) VALUES(?,?,?,?,?,?,?,?)').bind(...v).run();
+          await DB.prepare('INSERT INTO devices(name,grp,type,protocol,address,port,note,monitor,via) VALUES(?,?,?,?,?,?,?,?,?)').bind(...v).run();
           A(me.u, 'device_add', `${v[0]} (${v[4]})`);
           return J({ ok: true });
         }
@@ -184,7 +240,7 @@ export default {
         if (m === 'PUT') {
           const v = dev(await req.json());
           if (!v) return J({ error: '名称和地址必填' }, 400);
-          await DB.prepare('UPDATE devices SET name=?,grp=?,type=?,protocol=?,address=?,port=?,note=?,monitor=?,status=NULL,latency=NULL,checked_at=NULL WHERE id=?')
+          await DB.prepare('UPDATE devices SET name=?,grp=?,type=?,protocol=?,address=?,port=?,note=?,monitor=?,via=?,status=NULL,latency=NULL,checked_at=NULL WHERE id=?')
             .bind(...v, mm[1]).run();
           A(me.u, 'device_update', `${old.name} → ${v[0]} (${v[4]})`);
           return J({ ok: true });
@@ -246,7 +302,7 @@ export default {
   // 定时任务:检测最久没检测的 40 台设备 + 清理旧日志
   async scheduled(ev, env, ctx) {
     ctx.waitUntil((async () => {
-      const r = await env.DB.prepare('SELECT * FROM devices WHERE monitor=1 ORDER BY COALESCE(checked_at,0) LIMIT 40').all();
+      const r = await env.DB.prepare("SELECT * FROM devices WHERE monitor=1 AND via='cloud' ORDER BY COALESCE(checked_at,0) LIMIT 40").all();
       await inBatches(r.results, (d) => check(env, d));
       await env.DB.prepare('DELETE FROM audit WHERE ts<?').bind(Date.now() - 180 * 864e5).run();
     })());
