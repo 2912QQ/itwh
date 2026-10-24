@@ -5,36 +5,67 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>网络设备运维平台</title>
 <style>
-:root{--bg:#f4f6fa;--card:#fff;--tx:#1b2430;--mu:#6b7686;--bd:#dde2ea;--pr:#2563eb;--dg:#dc2626}
-@media(prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#18202a;--tx:#e6ebf2;--mu:#8b97a8;--bd:#2a3442;--pr:#4f8bff;--dg:#f05252}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,"PingFang SC","Microsoft YaHei",sans-serif}
-header{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--bd);position:sticky;top:0}
-header h1{font-size:17px;margin:0;flex:1}
-button{background:var(--pr);color:#fff;border:0;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px}
-button.g{background:transparent;color:var(--tx);border:1px solid var(--bd)}button.d{background:var(--dg)}
-input,select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;font-size:13px;width:100%}
-main{max-width:1100px;margin:0 auto;padding:20px}
-.notice{background:#fef3c7;color:#92400e;padding:10px 14px;border-radius:8px;margin-bottom:16px}
-h2{font-size:14px;color:var(--mu);margin:22px 0 10px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;cursor:pointer;transition:.15s}
-.card:hover{border-color:var(--pr);transform:translateY(-2px)}
-.card b{display:block;font-size:15px}.card small{color:var(--mu);display:block;word-break:break-all}
-.tag{display:inline-block;font-size:11px;background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:0 6px;margin-top:6px}
-.login{max-width:340px;margin:12vh auto;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:28px}
-.login h1{font-size:19px;margin:0 0 18px;text-align:center}.login input{margin-bottom:12px}.login button{width:100%;padding:10px}
-.err{color:var(--dg);min-height:20px;font-size:13px}
-.panel{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:16px}
-.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px}
-.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs .on{background:var(--pr);color:#fff}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#9ca3af;margin-right:7px}.dot.on{background:#16a34a}.dot.off{background:#dc2626}
-table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);word-break:break-all}
-td button{padding:3px 9px;margin-right:4px}.hide{display:none}
+:root{--bg:#050b16;--pn:rgba(10,20,38,.72);--bd:rgba(56,189,248,.22);--cy:#22d3ee;--gn:#22c55e;--rd:#ef4444;--tx:#d6e4f5;--mu:#7a8ba3;--mono:ui-monospace,"JetBrains Mono",Consolas,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;color:var(--tx);font:14px/1.5 system-ui,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;background:radial-gradient(900px 500px at 15% -10%,rgba(34,211,238,.14),transparent 60%),radial-gradient(800px 500px at 100% 0,rgba(99,102,241,.16),transparent 60%),linear-gradient(rgba(56,189,248,.045) 1px,transparent 1px) 0 0/40px 40px,linear-gradient(90deg,rgba(56,189,248,.045) 1px,transparent 1px) 0 0/40px 40px,var(--bg);background-attachment:fixed}
+body::after{content:"";position:fixed;left:0;right:0;top:-120px;height:120px;pointer-events:none;background:linear-gradient(transparent,rgba(34,211,238,.07),transparent);animation:scan 7s linear infinite}
+@keyframes scan{to{transform:translateY(calc(100vh + 240px))}}
+header{display:flex;align-items:center;gap:12px;padding:12px 24px;background:rgba(5,11,22,.8);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5;box-shadow:0 1px 24px rgba(34,211,238,.08)}
+.logo{width:26px;height:26px;border:2px solid var(--cy);border-radius:7px;position:relative;box-shadow:0 0 12px var(--cy),inset 0 0 8px rgba(34,211,238,.5);animation:glow 3s ease-in-out infinite}
+.logo::after{content:"";position:absolute;inset:6px;background:var(--cy);border-radius:2px}
+@keyframes glow{50%{box-shadow:0 0 22px var(--cy),inset 0 0 12px rgba(34,211,238,.8)}}
+header h1{font-size:17px;margin:0;letter-spacing:2px;background:linear-gradient(90deg,#e0f2fe,var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sp{flex:1}.hud{font:12px var(--mono);color:var(--cy);opacity:.85}
+button{background:linear-gradient(135deg,#0891b2,#4f46e5);color:#fff;border:0;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;box-shadow:0 0 12px rgba(34,211,238,.25);transition:.15s}
+button:hover{box-shadow:0 0 20px rgba(34,211,238,.55);transform:translateY(-1px)}
+button.g{background:rgba(34,211,238,.06);color:var(--tx);border:1px solid var(--bd);box-shadow:none}
+button.g:hover{border-color:var(--cy);color:var(--cy)}
+button.d{background:linear-gradient(135deg,#dc2626,#9f1239)}button:disabled{opacity:.5;cursor:wait}
+input,select{background:rgba(2,8,18,.7);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:8px 11px;font-size:13px;width:100%;outline:0;transition:.15s}
+input:focus,select:focus{border-color:var(--cy);box-shadow:0 0 0 3px rgba(34,211,238,.15)}
+::placeholder{color:#52627a}
+main{max-width:1180px;margin:0 auto;padding:22px}
+.notice{border:1px solid rgba(251,191,36,.4);background:rgba(251,191,36,.08);color:#fcd34d;padding:10px 14px;border-radius:8px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.stat{padding:12px 16px;border:1px solid var(--bd);border-radius:10px;background:var(--pn);backdrop-filter:blur(8px)}
+.stat b{display:block;font:600 26px var(--mono);color:var(--c);text-shadow:0 0 14px var(--c)}
+.stat span{color:var(--mu);font-size:12px;letter-spacing:1px}
+h2{font:600 13px var(--mono);color:var(--cy);margin:24px 0 12px;letter-spacing:1px;display:flex;align-items:center;gap:10px}
+h2::before{content:"//";opacity:.5}h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--bd),transparent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.card{--st:#475569;position:relative;padding:14px 14px 14px 18px;border:1px solid var(--bd);border-radius:10px;background:var(--pn);backdrop-filter:blur(8px);cursor:pointer;transition:.18s;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--st);box-shadow:0 0 12px var(--st)}
+.card.on{--st:var(--gn)}.card.off{--st:var(--rd)}
+.card:hover{border-color:var(--cy);transform:translateY(-3px);box-shadow:0 8px 28px rgba(34,211,238,.18)}
+.card b{display:flex;align-items:center;font-size:15px}
+.card small{display:block;color:var(--mu);word-break:break-all}.card .ip{font:12px var(--mono);color:#93c5fd;margin-top:2px}
+.tag{display:inline-block;font:11px var(--mono);color:var(--cy);border:1px solid var(--bd);border-radius:4px;padding:0 6px;margin:6px 4px 0 0}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#64748b;margin-right:8px;flex:none}
+.dot.on{background:var(--gn);box-shadow:0 0 8px var(--gn);animation:pulse 2s infinite}.dot.off{background:var(--rd);box-shadow:0 0 8px var(--rd)}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+.login{position:relative;max-width:360px;margin:13vh auto 0;padding:30px;border:1px solid var(--bd);border-radius:14px;background:var(--pn);backdrop-filter:blur(14px);box-shadow:0 0 60px rgba(34,211,238,.12)}
+.login::before,.login::after{content:"";position:absolute;width:18px;height:18px;border:2px solid var(--cy)}
+.login::before{left:-1px;top:-1px;border-right:0;border-bottom:0;border-radius:14px 0 0 0}
+.login::after{right:-1px;bottom:-1px;border-left:0;border-top:0;border-radius:0 0 14px 0}
+.login h1{font-size:19px;margin:6px 0 4px;text-align:center;letter-spacing:3px;color:#e0f2fe;text-shadow:0 0 16px var(--cy)}
+.login .sub{text-align:center;font:11px var(--mono);color:var(--cy);opacity:.7;margin-bottom:20px}
+.login input{margin-bottom:12px}.login button{width:100%;padding:10px;letter-spacing:4px}
+.err{color:#fca5a5;min-height:20px;font-size:13px}
+.panel{border:1px solid var(--bd);border-radius:12px;background:var(--pn);backdrop-filter:blur(8px);padding:18px;margin-bottom:16px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}.tabs .on{background:linear-gradient(135deg,#0891b2,#4f46e5);color:#fff;border:0}
+table{width:100%;border-collapse:collapse}th{font:600 12px var(--mono);color:var(--cy);letter-spacing:1px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(56,189,248,.12);word-break:break-all}
+td button{padding:3px 10px;margin-right:4px}.hide{display:none!important}
+.mask{position:fixed;inset:0;background:rgba(2,6,14,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:20}
+.mask .login{margin:0;width:90%}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
 <body>
 <div id="login" class="login hide">
   <h1 id="ltitle">网络设备运维平台</h1>
+  <div class="sub">SECURE ACCESS // 身份验证</div>
   <input id="u" placeholder="用户名" autocomplete="username">
   <input id="p" type="password" placeholder="密码" autocomplete="current-password">
   <div class="err" id="lerr"></div>
@@ -43,7 +74,7 @@ td button{padding:3px 9px;margin-right:4px}.hide{display:none}
 
 <div id="app" class="hide">
   <header>
-    <h1 id="title"></h1><span id="who" style="color:var(--mu)"></span>
+    <i class="logo"></i><h1 id="title"></h1><span class="sp"></span><span class="hud" id="clock"></span><span id="who" class="hud" style="color:var(--mu)"></span>
     <button class="g" id="refresh">刷新状态</button>
     <button class="g" id="toggle">后台管理</button>
     <button class="g" id="logout">退出</button>
@@ -51,7 +82,8 @@ td button{padding:3px 9px;margin-right:4px}.hide{display:none}
   <main>
     <div id="view-home">
       <div id="notice" class="notice hide"></div>
-      <input id="q" placeholder="搜索设备名称 / 地址 / 备注…" style="max-width:360px;margin-bottom:6px">
+      <div class="stats" id="stats"></div>
+      <input id="q" placeholder="搜索设备名称 / 地址 / 备注…" style="max-width:380px;margin-bottom:6px">
       <div id="list"></div>
     </div>
 
@@ -94,6 +126,13 @@ td button{padding:3px 9px;margin-right:4px}.hide{display:none}
   </main>
 </div>
 
+<div id="unlock" class="mask hide"><div class="login">
+  <h1>管理员验证</h1><div class="sub">ADMIN ACCESS // 请再次输入密码</div>
+  <input id="up" type="password" placeholder="当前账号密码" autocomplete="current-password">
+  <div class="err" id="uerr"></div>
+  <button id="ubtn">验 证</button>
+  <button class="g" id="ucancel" style="margin-top:8px;letter-spacing:2px">取 消</button>
+</div></div>
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -103,6 +142,7 @@ async function api(path,method='GET',body){
   const r=await fetch('/api/'+path,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
   const d=await r.json().catch(()=>({}));
   if(r.status===401&&path!=='login'){showLogin();throw new Error('401')}
+  if(r.status===403&&d.code==='LOCKED'){if(me)me.unlocked=false;lockUI();throw new Error(d.error)}
   if(!r.ok)throw new Error(d.error||'请求失败');
   return d;
 }
@@ -128,12 +168,12 @@ function applySettings(){
 }
 async function loadDevices(){devices=await api('devices');renderHome();renderRows()}
 
-function renderHome(){
+function renderHome(){renderStats();
   const q=$('q').value.trim().toLowerCase(),g={};
   devices.filter(d=>!q||[d.name,d.address,d.note,d.type,d.grp].join(' ').toLowerCase().includes(q))
     .forEach(d=>(g[d.grp]=g[d.grp]||[]).push(d));
   $('list').innerHTML=Object.keys(g).map(k=>`<h2>${esc(k)}</h2><div class="grid">`+g[k].map(d=>
-    `<div class="card" data-id="${d.id}"><b>${dot(d)}${esc(d.name)}</b><small>${esc(d.address)}${d.port?':'+esc(d.port):''}</small><small>${stat(d)}</small>
+    `<div class="card ${cls(d)}" data-id="${d.id}"><b>${dot(d)}${esc(d.name)}</b><small class="ip">${esc(d.address)}${d.port?':'+esc(d.port):''}</small><small>${stat(d)}</small>
      <span class="tag">${esc(d.protocol)}</span> ${d.type?`<span class="tag">${esc(d.type)}</span>`:''}
      ${d.note?`<small style="margin-top:6px">${esc(d.note)}</small>`:''}</div>`).join('')+'</div>').join('')||'<p style="color:var(--mu)">暂无设备</p>';
 }
@@ -151,10 +191,25 @@ $('lbtn').onclick=async()=>{
 };
 $('p').onkeydown=e=>{if(e.key==='Enter')$('lbtn').click()};
 $('logout').onclick=async()=>{await api('logout','POST').catch(()=>{});showLogin()};
+let adminOpen=false;
+function showAdmin(on){
+  adminOpen=on;$('view-admin').classList.toggle('hide',!on);$('view-home').classList.toggle('hide',on);
+  $('toggle').textContent=on?'返回首页':'后台管理';
+  if(on)loadUsers().catch(()=>{});
+}
+function askUnlock(){$('up').value='';$('uerr').textContent='';$('unlock').classList.remove('hide');$('up').focus()}
+function lockUI(){showAdmin(false);askUnlock()}
 $('toggle').onclick=()=>{
-  const a=$('view-admin').classList.toggle('hide');$('view-home').classList.toggle('hide',!a);
-  $('toggle').textContent=a?'后台管理':'返回首页';if(!a)loadUsers();
+  if(adminOpen){showAdmin(false);me.unlocked=false;api('admin/lock','POST').catch(()=>{});return}
+  me.unlocked?showAdmin(true):askUnlock();
 };
+$('ubtn').onclick=async()=>{
+  $('uerr').textContent='';
+  try{await api('admin/unlock','POST',{password:$('up').value});me.unlocked=true;$('unlock').classList.add('hide');showAdmin(true)}
+  catch(e){$('uerr').textContent=e.message}
+};
+$('up').onkeydown=e=>{if(e.key==='Enter')$('ubtn').click()};
+$('ucancel').onclick=()=>$('unlock').classList.add('hide');
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.className='g');b.className='on';
   ['dev','set','usr','log'].forEach(t=>$('t-'+t).classList.toggle('hide',t!==b.dataset.t));
@@ -221,9 +276,18 @@ async function checkAll(){
 $('refresh').onclick=checkAll;
 setInterval(()=>{if(me&&!$('view-home').classList.contains('hide'))loadDevices().catch(()=>{})},60000);
 
+// ---- 统计 / 时钟 ----
+const cls=d=>!d.monitor||d.status==null?'':d.status?'on':'off';
+function renderStats(){
+  const m=devices.filter(d=>d.monitor),on=m.filter(d=>d.status===1).length,off=m.filter(d=>d.status===0).length;
+  $('stats').innerHTML=[['设备总数',devices.length,'#22d3ee'],['在线',on,'#22c55e'],['离线',off,'#ef4444'],['未检测',devices.length-on-off,'#94a3b8']]
+    .map(x=>`<div class="stat" style="--c:${x[2]}"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('');
+}
+const tick=()=>{$('clock').textContent=new Date().toLocaleString('zh-CN',{hour12:false})};tick();setInterval(tick,1000);
+
 // ---- 审计日志 ----
 let logLast=0;
-const ACT={login:'登录',login_fail:'登录失败',logout:'退出',open_device:'打开设备',device_add:'新增设备',device_update:'修改设备',device_delete:'删除设备',settings_update:'修改设置',user_save:'添加/重置用户',user_delete:'删除用户'};
+const ACT={login:'登录',login_fail:'登录失败',unlock:'后台验证',unlock_fail:'后台验证失败',logout:'退出',open_device:'打开设备',device_add:'新增设备',device_update:'修改设备',device_delete:'删除设备',settings_update:'修改设置',user_save:'添加/重置用户',user_delete:'删除用户'};
 async function loadLog(){
   const r=await api('audit?limit=100'+(logLast?'&before='+logLast:''));
   $('log-rows').insertAdjacentHTML('beforeend',r.map(x=>`<tr><td>${new Date(x.ts).toLocaleString('zh-CN',{hour12:false})}</td><td>${esc(x.user)}</td><td>${esc(ACT[x.action]||x.action)}</td><td>${esc(x.detail)}</td><td>${esc(x.ip)}</td></tr>`).join(''));
