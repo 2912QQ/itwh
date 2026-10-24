@@ -1,6 +1,7 @@
 name = "itwh"
 main = "src/worker.js"
 compatibility_date = "2025-01-01"
+keep_vars = true
 
 # 自定义域名:域名需已托管在 Cloudflare。改成你的域名后取消注释,再 wrangler deploy
 # routes = [{ pattern = "ops.example.com", custom_domain = true }]
